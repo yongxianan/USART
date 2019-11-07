@@ -23,7 +23,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "rcc.h"
+#include "nvic.h"
+#include "uart.h"
+#include "gpio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,7 +69,59 @@ static void MX_GPIO_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	/*
+	 * enable clock for USART1, GPIOA
+	 */
+	RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST;
+	RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+	RCC->AHB1RSTR |= RCC_AHB1RSTR_GPIOARST;
+	RCC->AHB1ENR |=		RCC_AHB1ENR_GPIOAEN;
+	/*
+	 * 37:USART1
+	 * 38:USART2
+	 * 39:USART3
+	 */
+	nvicEnableInterrupt(37);
+	//nvicEnableInterrupt(38);
 
+	/*
+	 * AF7
+	 * USART1_TX	PA9
+	 * USART1_RX	PA10
+	 */
+	configGPIO(GPIOA,9,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,HIGH_SPEED,NO_PUPD,AF7);
+	configGPIO(GPIOA,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL		\
+		,HIGH_SPEED,NO_PUPD,AF7);
+	/*
+	 * AF7
+	 * USART2_TX	PA2
+	 * USART2_RX	PA3
+	 */
+	configGPIO(GPIOA,2,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,HIGH_SPEED,NO_PUPD,AF7);
+	configGPIO(GPIOA,3,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,HIGH_SPEED,NO_PUPD,AF7);
+
+	/*
+	 * USART1 configure (master)
+	 */
+	UsartConfigData usartConfigData;
+	usartConfigData.baudrate = 9600;
+	usartConfigData.peripheralFreq = 72000000;
+	usartConfigData.muteModeAdress = 9;
+	usartConfig(USART1,WORD_9_BIT_DATA | RXNE_IT 		\
+			| TRANSMIT_ENABLE | RECEIVER_ENABLE			\
+			| USART_ENABLE								\
+			 ,&usartConfigData);
+	/*
+	 * USART2 configure (slave)
+	 */
+	usartConfig(USART2,WORD_9_BIT_DATA | RXNE_IT 			\
+		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
+		    | USART_ENABLE | WAKE_ADDRESS_MARK     	        \
+		    | RWU_RECEIVER_MUTE_MODE						\
+			,&usartConfigData);
   /* USER CODE END 1 */
   
 
@@ -161,7 +216,9 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void USART1_IRQHandler(void){
 
+}
 /* USER CODE END 4 */
 
 /**
