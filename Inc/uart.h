@@ -39,6 +39,7 @@ struct UsartConfigData{
  */
 #define TRANSMIT_DR_EMPTY				(1<<7)
 #define	TRANSMIT_COMPLETE				(1<<6)
+#define	USART_READY_TO_READ				(1<<5)
 
 
 /*

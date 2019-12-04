@@ -60,6 +60,7 @@ static void MX_GPIO_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+
 /* USER CODE END 0 */
 
 /**
@@ -69,21 +70,32 @@ static void MX_GPIO_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+
 	/*
-	 * enable clock for USART1, GPIOA
+	 * enable clock for USART1, GPIOA, USART2
 	 */
-	RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST;
-	RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+	RCC->APB1RSTR |= RCC_APB1RSTR_UART2RST  ;
+	RCC->APB1RSTR &= ~(RCC_APB1RSTR_UART2RST);
+	RCC->APB1ENR |= (RCC_APB1ENR_USART2EN);
+
+	RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST  ;
+	RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART1RST);
+	RCC->APB2ENR |= (RCC_APB2ENR_USART1EN);
+
 	RCC->AHB1RSTR |= RCC_AHB1RSTR_GPIOARST;
-	RCC->AHB1ENR |=		RCC_AHB1ENR_GPIOAEN;
+	RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST);
+	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN);
+
 	/*
 	 * 37:USART1
 	 * 38:USART2
 	 * 39:USART3
+	 * 71:USART6
 	 */
 	nvicEnableInterrupt(37);
-	//nvicEnableInterrupt(38);
-
+	nvicEnableInterrupt(38);
+	nvicEnableInterrupt(39);
+	nvicEnableInterrupt(71);
 	/*
 	 * AF7
 	 * USART1_TX	PA9
@@ -91,7 +103,7 @@ int main(void)
 	 */
 	configGPIO(GPIOA,9,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,HIGH_SPEED,NO_PUPD,AF7);
-	configGPIO(GPIOA,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL		\
+	configGPIO(GPIOA,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,HIGH_SPEED,NO_PUPD,AF7);
 	/*
 	 * AF7
@@ -103,25 +115,54 @@ int main(void)
 	configGPIO(GPIOA,3,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,HIGH_SPEED,NO_PUPD,AF7);
 
+
 	/*
 	 * USART1 configure (master)
 	 */
 	UsartConfigData usartConfigData;
 	usartConfigData.baudrate = 9600;
 	usartConfigData.peripheralFreq = 72000000;
-	usartConfigData.muteModeAdress = 9;
 	usartConfig(USART1,WORD_9_BIT_DATA | RXNE_IT 		\
 			| TRANSMIT_ENABLE | RECEIVER_ENABLE			\
-			| USART_ENABLE								\
-			 ,&usartConfigData);
+			,&usartConfigData);
+	usartCR1(USART1,USART_ENABLE);
 	/*
 	 * USART2 configure (slave)
 	 */
+	UsartConfigData usartConfigData1;
+	usartConfigData1.baudrate = 9600;
+	usartConfigData1.peripheralFreq = 72000000;
+	usartConfigData1.muteModeAdress = 1;
 	usartConfig(USART2,WORD_9_BIT_DATA | RXNE_IT 			\
 		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
-		    | USART_ENABLE | WAKE_ADDRESS_MARK     	        \
-		    | RWU_RECEIVER_MUTE_MODE						\
-			,&usartConfigData);
+		    | WAKE_ADDRESS_MARK | RWU_RECEIVER_MUTE_MODE	\
+			,&usartConfigData1);
+	usartCR1(USART2,USART_ENABLE);
+	/*
+	 * USART3 configure (slave)
+	 */
+	UsartConfigData usartConfigData2;
+	usartConfigData2.baudrate = 9600;
+	usartConfigData2.peripheralFreq = 72000000;
+	usartConfigData2.muteModeAdress = 2;
+	usartConfig(USART3,WORD_9_BIT_DATA | RXNE_IT 			\
+		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
+		    | WAKE_ADDRESS_MARK | RWU_RECEIVER_MUTE_MODE	\
+			,&usartConfigData2);
+	usartCR1(USART3,USART_ENABLE);
+
+	/*
+	 * USART6 configure (slave)
+	 */
+	UsartConfigData usartConfigData3;
+	usartConfigData3.baudrate = 9600;
+	usartConfigData3.peripheralFreq = 72000000;
+	usartConfigData3.muteModeAdress = 3;
+	usartConfig(USART6,WORD_9_BIT_DATA | RXNE_IT 			\
+		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
+		    | WAKE_ADDRESS_MARK | RWU_RECEIVER_MUTE_MODE	\
+			,&usartConfigData3);
+	usartCR1(USART6,USART_ENABLE);
   /* USER CODE END 1 */
   
 
@@ -151,6 +192,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //stateMachine(USART *usart,SMInfo *smInfo);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -216,8 +258,19 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+uint16_t U1Msg=0;
+uint16_t U2Msg=0;
 void USART1_IRQHandler(void){
+	if(USART1->SR & USART_READY_TO_READ){
+		U1Msg = (uint16_t)(0x1ff & USART1->DR);
+	}
+	//if()
+}
 
+void USART2_IRQHandler(void){
+	if(USART2->SR & USART_READY_TO_READ){
+		U2Msg= (uint16_t)(USART2->DR);
+	}
 }
 /* USER CODE END 4 */
 

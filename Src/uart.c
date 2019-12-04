@@ -26,8 +26,10 @@ void usartConfig(USART *usart,uint64_t CR,UsartConfigData *usartConfigData){
 	fractional = (int)((float)(divider-mantissa)*16);
 	usart->BRR = (mantissa<<4)|(fractional);
 }
-
+void usartCR1(USART *usart,uint64_t CR){
+	usart->CR1 |= (uint32_t)(CR & 0xffff);
+}
 void usartSend9Bit(USART *usart,uint16_t data){
+	while((usart->SR & TRANSMIT_DR_EMPTY)!=TRANSMIT_DR_EMPTY);
 	usart->DR |= (data & 0x1ff);
-	while(usart->SR & TRANSMIT_DR_EMPTY);
 }

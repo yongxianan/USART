@@ -9,6 +9,7 @@
 #define GPIO_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct GPIOx GPIOx;
 struct GPIOx{
@@ -24,7 +25,10 @@ struct GPIOx{
 	volatile	uint32_t	AFRH;
 };
 
-void configGPIO(GPIOx *GPIO,uint8_t pin,uint8_t MODER,uint8_t OTYPER,uint8_t OSPEEDR,uint8_t PUPDR,uint8_t AFRLH);
+void configGPIO(GPIOx *GPIO,uint32_t pin,uint32_t MODER,uint32_t OTYPER,uint32_t OSPEEDR,uint32_t PUPDR,uint32_t AFRLH);
+void setResetGPIO(GPIOx *GPIO, uint32_t pin, bool on);
+bool readGPIO(GPIOx *GPIO, uint32_t pin);
+void toggleGPIO(GPIOx *GPIO, uint32_t pin);
 
 #define	GPIOA	((GPIOx *)(0x40020000))
 #define	GPIOB	((GPIOx *)(0x40020400))
