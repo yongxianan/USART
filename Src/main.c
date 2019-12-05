@@ -71,54 +71,67 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-	/*
-	 * enable clock for USART1, GPIOA, USART2
-	 */
-	RCC->APB1RSTR |= RCC_APB1RSTR_UART2RST  ;
-	RCC->APB1RSTR &= ~(RCC_APB1RSTR_UART2RST);
-	RCC->APB1ENR |= (RCC_APB1ENR_USART2EN);
+	//USART1, USART2, USART3, USART6 clock enable
+	RCC->APB1RSTR |= (RCC_APB1RSTR_USART2RST | RCC_APB1RSTR_USART3RST);
+	RCC->APB1RSTR &= ~(RCC_APB1RSTR_USART2RST | RCC_APB1RSTR_USART3RST);
+	RCC->APB1ENR |= (RCC_APB1ENR_USART2EN | RCC_APB1ENR_USART3EN);
 
-	RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST  ;
-	RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART1RST);
-	RCC->APB2ENR |= (RCC_APB2ENR_USART1EN);
+	RCC->APB2RSTR |= (RCC_APB2RSTR_USART1RST | RCC_APB2RSTR_USART6RST)  ;
+	RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART1RST | RCC_APB2RSTR_USART6RST);
+	RCC->APB2ENR |= (RCC_APB2ENR_USART1EN | RCC_APB2ENR_USART6EN);
 
+
+	//GPIO clock enable
 	RCC->AHB1RSTR |= RCC_AHB1RSTR_GPIOARST;
 	RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST);
 	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN);
 
-	/*
-	 * 37:USART1
-	 * 38:USART2
-	 * 39:USART3
-	 * 71:USART6
-	 */
+
+	//37:USART1
+	//38:USART2
+	//39:USART3
+	//71:USART6
 	nvicEnableInterrupt(37);
 	nvicEnableInterrupt(38);
 	nvicEnableInterrupt(39);
 	nvicEnableInterrupt(71);
-	/*
-	 * AF7
-	 * USART1_TX	PA9
-	 * USART1_RX	PA10
-	 */
+
+
+	//AF7
+	//USART1_TX	PA9
+	//USART1_RX	PA10
 	configGPIO(GPIOA,9,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
-		,HIGH_SPEED,NO_PUPD,AF7);
+		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 	configGPIO(GPIOA,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
-		,HIGH_SPEED,NO_PUPD,AF7);
-	/*
-	 * AF7
-	 * USART2_TX	PA2
-	 * USART2_RX	PA3
-	 */
+		,VERY_HIGH_SPEED,NO_PUPD,AF7);
+
+
+	//USART2_TX	PA2
+	//USART2_RX	PA3
 	configGPIO(GPIOA,2,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
-		,HIGH_SPEED,NO_PUPD,AF7);
+		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 	configGPIO(GPIOA,3,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
-		,HIGH_SPEED,NO_PUPD,AF7);
+		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 
 
-	/*
-	 * USART1 configure (master)
-	 */
+	//USART3_TX	PB10
+	//USART3_RX	PB11
+	configGPIO(GPIOB,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,VERY_HIGH_SPEED,NO_PUPD,AF7);
+	configGPIO(GPIOB,11,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,VERY_HIGH_SPEED,NO_PUPD,AF7);
+
+
+	//AF8
+	//USART6_TX	PC6
+	//USART6_RX	PC7
+	configGPIO(GPIOC,6,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,VERY_HIGH_SPEED,NO_PUPD,AF8);
+	configGPIO(GPIOC,7,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,VERY_HIGH_SPEED,NO_PUPD,AF8);
+
+
+	//USART1 configure (master)
 	UsartConfigData usartConfigData;
 	usartConfigData.baudrate = 9600;
 	usartConfigData.peripheralFreq = 72000000;
@@ -126,9 +139,9 @@ int main(void)
 			| TRANSMIT_ENABLE | RECEIVER_ENABLE			\
 			,&usartConfigData);
 	usartCR1(USART1,USART_ENABLE);
-	/*
-	 * USART2 configure (slave)
-	 */
+
+
+	//USART2 configure (slave)
 	UsartConfigData usartConfigData1;
 	usartConfigData1.baudrate = 9600;
 	usartConfigData1.peripheralFreq = 72000000;
@@ -138,9 +151,9 @@ int main(void)
 		    | WAKE_ADDRESS_MARK | RWU_RECEIVER_MUTE_MODE	\
 			,&usartConfigData1);
 	usartCR1(USART2,USART_ENABLE);
-	/*
-	 * USART3 configure (slave)
-	 */
+
+
+	//USART3 configure (slave)
 	UsartConfigData usartConfigData2;
 	usartConfigData2.baudrate = 9600;
 	usartConfigData2.peripheralFreq = 72000000;
@@ -151,9 +164,9 @@ int main(void)
 			,&usartConfigData2);
 	usartCR1(USART3,USART_ENABLE);
 
-	/*
-	 * USART6 configure (slave)
-	 */
+
+
+	//USART6 configure (slave)
 	UsartConfigData usartConfigData3;
 	usartConfigData3.baudrate = 9600;
 	usartConfigData3.peripheralFreq = 72000000;
