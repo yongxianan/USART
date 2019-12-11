@@ -1,0 +1,80 @@
+USART1		0x0000 00D4
+
+AF7
+USART1_TX	PA9
+USART1_RX	PA10
+
+AF7
+USART2_TX	PA2
+USART2_RX	PA3
+
+The non addressed devices may be placed in mute mode by means of the muting function.
+In mute mode:
+• None of the reception status bits can be set.
+• All the receive interrupts are inhibited.
+• The RWU bit in USART_CR1 register is set to 1. RWU can be controlled automatically
+by hardware or written by the software under certain conditions.
+
+The USART can enter or exit from mute mode using one of two methods, depending on the
+WAKE bit in the USART_CR1 register:
+• Idle Line detection if the WAKE bit is reset,
+• Address Mark detection if the WAKE bit is set.
+
+
+Address mark detection (WAKE=1)
+In this mode, bytes are recognized as addresses if their MSB is a ‘1 else they are
+considered as data. In an address byte, the address of the targeted receiver is put on the 4
+LSB. This 4-bit word is compared by the receiver with its own address which is programmed
+in the ADD bits in the USART_CR2 register.
+
+
+
+buffer with flag, index
+
+Index	Read Flag	Action (buffer)
+0.	FALSE		interrupt can increase index, put buffer.
+			state machine can't touch including Read Flag.
+
+1-2. 	FALSE		interrupt can increase index, put buffer.
+			state machine will set TRUE.
+
+	TRUE		state machine extract data, reset index, set FALSE.
+			interrupt can't touch all
+
+
+
+
+state machine for USART1 (master)
+(note: one MSB bit to differentiate address or data)
+1. read button
+	out: (to USART 2)
+	U2 address		= 1 0010 0001
+	read button command	= 0 0000 0001
+
+	in:
+	buttonState 		= 0 0000 000X
+
+
+2. control LED
+	out: (to USART 3)
+	U3 address		= 1 0010 0010
+	RGB data		= 0 0000 0XXX (based on buttonState)
+
+3. got 2 usart, receive from master, communicate with PC (Usart 6 to PC)
+	out: (to USART 6)
+	U6 address		= 1 0010 0011
+	RGB data		= 0 0000 0XXX
+	buttonState 		= 0 0000 000X
+
+
+
+
+
+-sm(event,terminalData)
+
+can be NO_EVENT in eventID
+
+struct event{
+	int eventID;
+	void *data;
+}

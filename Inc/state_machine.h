@@ -16,6 +16,19 @@ typedef enum{
   PROBE
 }MasterState;
 
+typedef enum{
+  CHECK_ADDRESS,
+  TASK_1,
+  TASK_2,
+  TASK_3
+}SlaveState;
+
+typedef struct{
+	uint16_t address;
+	uint16_t message;
+  SlaveState state;
+}SlaveInfo;
+
 typedef struct{
   bool ReadFlag;
   uint8_t buttonState;

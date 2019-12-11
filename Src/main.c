@@ -27,6 +27,7 @@
 #include "nvic.h"
 #include "uart.h"
 #include "gpio.h"
+#include "state_machine.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,7 +60,7 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+SMInfo smInfo;
 
 /* USER CODE END 0 */
 
@@ -70,6 +71,13 @@ static void MX_GPIO_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	//initialize for the state machine
+	smInfo.masterState = READ_BUTTON;
+	smInfo.ReadFlag = false;
+	smInfo.buttonState = 0b00000000;
+	smInfo.rgbState = 0b00000000;
+
+
 
 	//USART1, USART2, USART3, USART6 clock enable
 	RCC->APB1RSTR |= (RCC_APB1RSTR_USART2RST | RCC_APB1RSTR_USART3RST);
@@ -82,9 +90,9 @@ int main(void)
 
 
 	//GPIO clock enable
-	RCC->AHB1RSTR |= RCC_AHB1RSTR_GPIOARST;
-	RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST);
-	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN);
+	RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOARST | RCC_AHB1RSTR_GPIOGRST | RCC_AHB1RSTR_GPIOBRST | RCC_AHB1RSTR_GPIOCRST);
+	RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST | RCC_AHB1RSTR_GPIOGRST | RCC_AHB1RSTR_GPIOBRST | RCC_AHB1RSTR_GPIOCRST);
+	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOGEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN);
 
 
 	//37:USART1
@@ -96,7 +104,7 @@ int main(void)
 	nvicEnableInterrupt(39);
 	nvicEnableInterrupt(71);
 
-
+	//master
 	//AF7
 	//USART1_TX	PA9
 	//USART1_RX	PA10
@@ -105,7 +113,7 @@ int main(void)
 	configGPIO(GPIOA,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 
-
+	//slave
 	//USART2_TX	PA2
 	//USART2_RX	PA3
 	configGPIO(GPIOA,2,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
@@ -113,7 +121,7 @@ int main(void)
 	configGPIO(GPIOA,3,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 
-
+	//slave
 	//USART3_TX	PB10
 	//USART3_RX	PB11
 	configGPIO(GPIOB,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
@@ -121,7 +129,7 @@ int main(void)
 	configGPIO(GPIOB,11,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 
-
+	//slave
 	//AF8
 	//USART6_TX	PC6
 	//USART6_RX	PC7
@@ -134,7 +142,7 @@ int main(void)
 	//USART1 configure (master)
 	UsartConfigData usartConfigData;
 	usartConfigData.baudrate = 9600;
-	usartConfigData.peripheralFreq = 72000000;
+	usartConfigData.peripheralFreq = 45000000;
 	usartConfig(USART1,WORD_9_BIT_DATA | RXNE_IT 		\
 			| TRANSMIT_ENABLE | RECEIVER_ENABLE			\
 			,&usartConfigData);
@@ -144,7 +152,7 @@ int main(void)
 	//USART2 configure (slave)
 	UsartConfigData usartConfigData1;
 	usartConfigData1.baudrate = 9600;
-	usartConfigData1.peripheralFreq = 72000000;
+	usartConfigData1.peripheralFreq = 45000000;
 	usartConfigData1.muteModeAdress = 1;
 	usartConfig(USART2,WORD_9_BIT_DATA | RXNE_IT 			\
 		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
@@ -156,7 +164,7 @@ int main(void)
 	//USART3 configure (slave)
 	UsartConfigData usartConfigData2;
 	usartConfigData2.baudrate = 9600;
-	usartConfigData2.peripheralFreq = 72000000;
+	usartConfigData2.peripheralFreq = 45000000;
 	usartConfigData2.muteModeAdress = 2;
 	usartConfig(USART3,WORD_9_BIT_DATA | RXNE_IT 			\
 		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
@@ -169,13 +177,21 @@ int main(void)
 	//USART6 configure (slave)
 	UsartConfigData usartConfigData3;
 	usartConfigData3.baudrate = 9600;
-	usartConfigData3.peripheralFreq = 72000000;
+	usartConfigData3.peripheralFreq = 45000000;
 	usartConfigData3.muteModeAdress = 3;
 	usartConfig(USART6,WORD_9_BIT_DATA | RXNE_IT 			\
 		    | TRANSMIT_ENABLE | RECEIVER_ENABLE				\
 		    | WAKE_ADDRESS_MARK | RWU_RECEIVER_MUTE_MODE	\
 			,&usartConfigData3);
 	usartCR1(USART6,USART_ENABLE);
+
+	/*
+	 * PG13	green LED
+	 * PA0	blue button
+	 */
+	configGPIOWithoutAF(GPIOA,0,GPIO_INPUT,0,VERY_HIGH_SPEED,PULL_DOWN);
+	configGPIOWithoutAF(GPIOG,13,GPIO_OUTPUT,OUTPUT_PUSH_PULL			\
+				,HIGH_SPEED,NO_PUPD);
   /* USER CODE END 1 */
   
 
@@ -205,7 +221,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //stateMachine(USART *usart,SMInfo *smInfo);
+	  stateMachine(USART1,&smInfo);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -234,10 +250,16 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 72;
+  RCC_OscInitStruct.PLL.PLLN = 90;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Activate the Over-Drive mode 
+  */
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
@@ -246,11 +268,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -272,17 +294,74 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 uint16_t U1Msg=0;
-uint16_t U2Msg=0;
+SlaveInfo slaveInfoU2;
+SlaveInfo slaveInfoU3;
+SlaveInfo slaveInfoU6;
+
 void USART1_IRQHandler(void){
 	if(USART1->SR & USART_READY_TO_READ){
 		U1Msg = (uint16_t)(0x1ff & USART1->DR);
 	}
-	//if()
+	if(smInfo.ReadFlag == false && U1Msg==1){
+		smInfo.buttonState = 1;
+	}else if(smInfo.ReadFlag == false && U1Msg!=1){
+		smInfo.buttonState = 0;
+	}
+
 }
 
 void USART2_IRQHandler(void){
 	if(USART2->SR & USART_READY_TO_READ){
-		U2Msg= (uint16_t)(USART2->DR);
+		slaveInfoU2.message = (uint16_t)(0x1ff & USART2->DR);
+	}
+	slaveInfoU2.state = CHECK_ADDRESS;
+	slaveInfoU2.address = 0b100100001;
+	checkAddress(&slaveInfoU2);
+
+	//read button & send back
+	switch(slaveInfoU2.state){
+	case TASK_1:
+		usartSend9Bit(USART2,(uint16_t)readGPIO(GPIOA,0));
+		slaveInfoU2.state = CHECK_ADDRESS;
+		break;
+	}
+}
+
+void USART3_IRQHandler(void){
+	if(USART3->SR & USART_READY_TO_READ){
+		slaveInfoU3.message = (uint16_t)(0x1ff & USART3->DR);
+	}
+	slaveInfoU3.state = CHECK_ADDRESS;
+	slaveInfoU3.address = 0b100100010;
+	checkAddress(&slaveInfoU3);
+
+	//read button & send back
+	switch(slaveInfoU3.state){
+	case TASK_1:
+		setResetGPIO(GPIOG,13, (slaveInfoU3.message & 0x1));
+		slaveInfoU3.state = CHECK_ADDRESS;
+		break;
+	}
+}
+
+void USART6_IRQHandler(void){
+	if(USART6->SR & USART_READY_TO_READ){
+		slaveInfoU6.message = (uint16_t)(0x1ff & USART6->DR);
+	}
+	slaveInfoU6.state = CHECK_ADDRESS;
+	slaveInfoU6.address = 0b100100011;
+	checkAddress(&slaveInfoU6);
+
+	//read button & send back
+	switch(slaveInfoU6.state){
+	case TASK_1:
+		//send back to PC
+		slaveInfoU6.state = TASK_2;
+		break;
+	case TASK_2:
+		//send back to PC
+		slaveInfoU6.state = CHECK_ADDRESS;
+		break;
 	}
 }
 /* USER CODE END 4 */
