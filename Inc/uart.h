@@ -9,7 +9,8 @@
 #define UART_H_
 
 #include <stdint.h>
-
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef struct USART USART;
 struct USART{
@@ -115,4 +116,6 @@ struct UsartConfigData{
 
 void usartConfig(USART *usart,uint64_t CR,UsartConfigData *usartConfigData);
 void usartSend9Bit(USART *usart,uint16_t data);
+void usartCR1(USART *usart,uint64_t CR);
+void usartCR1Reset(USART *usart,uint64_t CR);
 #endif /* UART_H_ */

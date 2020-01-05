@@ -9,33 +9,48 @@
 #define STATE_MACHINE_H_
 #include <stdbool.h>
 #include "uart.h"
+#include "gpio.h"
+#include "queue.h"
+#include "adc.h"
 
 typedef enum{
-  READ_BUTTON,
-  CONTROL_LED,
-  PROBE
-}MasterState;
+	//used by master
+	READ_BUTTON,
+	CONTROL_LED,
+	PROBE,
+	SCAN_ADC_5,
+	SCAN_ADC_13,
+	//used by slave
+	CHECK_ADDR,
+	U2_MATCH_ADDRESS,
+	U3_MATCH_ADDRESS,
+	U6_MATCH_ADDRESS,
+	SENDBACK_BUTTON,
+	SET_LED,
+	PROBE_LED,
+	PROBE_BUTTON,
+	//ADC state
+	ADC5,
+	ADC13
+}State;
 
-typedef enum{
-  CHECK_ADDRESS,
-  TASK_1,
-  TASK_2,
-  TASK_3
-}SlaveState;
+
 
 typedef struct{
-	uint16_t address;
+	bool ReadFlag;
 	uint16_t message;
-  SlaveState state;
-}SlaveInfo;
+	uint8_t buttonState;
+	uint8_t ledState;
+	State state;
+	uint32_t adcData;
+}Info;
 
 typedef struct{
-  bool ReadFlag;
-  uint8_t buttonState;
-  uint8_t rgbState;
-  MasterState masterState;//interrput won't touch masterState
+	Info *info;
+	Queue *usartQueue;
 }SMInfo;
 
-void stateMachine(USART *usart, SMInfo *smInfo);
-
+//void stateMachine(USART *usart, SMInfo *smInfo);
+void checkAddressV2(Info *UInfo,uint16_t expAddress,State setMatchAddr);
+void stateMachineV2(Info *UInfo,Queue *usartTXQ);
 #endif /* STATE_MACHINE_H_ */

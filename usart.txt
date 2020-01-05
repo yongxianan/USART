@@ -32,14 +32,14 @@ in the ADD bits in the USART_CR2 register.
 buffer with flag, index
 
 Index	Read Flag	Action (buffer)
-0.	FALSE		interrupt can increase index, put buffer.
-			state machine can't touch including Read Flag.
+0.		FALSE		interrupt can increase index, put buffer.
+					state machine can't touch including Read Flag.
 
 1-2. 	FALSE		interrupt can increase index, put buffer.
-			state machine will set TRUE.
+					state machine will set TRUE.
 
-	TRUE		state machine extract data, reset index, set FALSE.
-			interrupt can't touch all
+		TRUE		state machine extract data, reset index, set FALSE.
+					interrupt can't touch all
 
 
 
@@ -48,7 +48,7 @@ state machine for USART1 (master)
 (note: one MSB bit to differentiate address or data)
 1. read button
 	out: (to USART 2)
-	U2 address		= 1 0010 0001
+	U2 address			= 1 0010 0001
 	read button command	= 0 0000 0001
 
 	in:
@@ -57,13 +57,13 @@ state machine for USART1 (master)
 
 2. control LED
 	out: (to USART 3)
-	U3 address		= 1 0010 0010
-	RGB data		= 0 0000 0XXX (based on buttonState)
+	U3 address			= 1 0010 0010
+	RGB data			= 0 0000 0XXX (based on buttonState)
 
 3. got 2 usart, receive from master, communicate with PC (Usart 6 to PC)
 	out: (to USART 6)
-	U6 address		= 1 0010 0011
-	RGB data		= 0 0000 0XXX
+	U6 address			= 1 0010 0011
+	RGB data			= 0 0000 0XXX
 	buttonState 		= 0 0000 000X
 
 
@@ -77,4 +77,119 @@ can be NO_EVENT in eventID
 struct event{
 	int eventID;
 	void *data;
+}
+
+
+typedef (*compare)(Node *node, int *valuePtr);
+same as
+typedef (*)(Node *node, int *valuePtr)		compare
+
+int intCompare(Node *node, int *valuePtr);
+
+compare functionPtr = &intCompare;
+
+intCompare(node, &value);
+same as
+functionPtr(node, &value);
+
+
+/////////////////////////////////////////////////////////////////
+typedef struct Node
+{
+  void *data;
+  struct Node *next;
+}node;
+
+typedef struct QueueList
+{
+    int sizeOfQueue;
+    size_t memSize;
+    node *head;
+    node *tail;
+}Queue;
+
+void queueInit(Queue *q, size_t memSize);
+int enqueue(Queue *, const void *);
+void dequeue(Queue *, void *);
+void queuePeek(Queue *, void *);
+void clearQueue(Queue *);
+int getQueueSize(Queue *);
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "Queue.h"
+
+void queueInit(Queue *queue, size_t memSize)
+{
+   queue->queueSize = 0;
+   queue->memSize = memSize;
+   queue->head = queue->tail = NULL;
+}
+
+bool enqueue(Queue *queue, const void *data)
+{
+	Node *newNode = (Node *)malloc(sizeof(Node));
+    if(newNode == NULL){
+        return false;
+    }
+    newNode->data = malloc(queue->memSize);
+    if(newNode->data == NULL){
+        free(newNode);
+        return false;
+    }
+    newNode->next = NULL;
+    memcpy(newNode->data, data, queue->memSize);
+    if(queue->queueSize == 0){
+        queue->head = queue->tail = newNode;
+    }else{
+        queue->tail->next = newNode;
+        queue->tail = newNode;
+    }
+	queue->queueSize++;
+    return true;
+}
+
+bool dequeue(Queue *queue, void *data){
+    if(queue->queueSize > 0){
+        Node *temp = queue->head;
+        memcpy(data, temp->data, queue->memSize);
+        if(queue->queueSize > 1){
+            queue->head = queue->head->next;
+        }
+        else{
+            queue->head = NULL;
+            queue->tail = NULL;
+        }
+        queue->queueSize--;
+        free(temp->data);
+        free(temp);
+		return true;
+    }else{
+		return false;
+	}
+}
+
+void queuePeek(Queue *queue, void *data){
+    if(queue->queueSize > 0)
+    {
+       Node *temp = queue->head;
+       memcpy(data, temp->data, queue->memSize);
+    }
+}
+
+void clearQueue(Queue *queue){
+  Node *temp;
+  while(queue->queueSize > 0){
+      temp = queue->head;
+      queue->head = temp->next;
+      free(temp->data);
+      free(temp);
+      queue->queueSize--;
+  }
+  queue->head = queue->tail = NULL;
+}
+
+int getQueueSize(Queue *queue){
+    return queue->queueSize;
 }

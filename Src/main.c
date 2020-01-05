@@ -28,6 +28,8 @@
 #include "uart.h"
 #include "gpio.h"
 #include "state_machine.h"
+#include "adc.h"
+#include "queue.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,8 +62,12 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-SMInfo smInfo;
-
+//SMInfo smInfo;
+Info U1Info,U2Info,U3Info,U6Info,adcInfo;
+Queue usart1TXQ,usart2TXQ,usart3TXQ,usart6TXQ;
+SMInfo smInfo,smInfoOut;
+Queue smQueue;
+volatile int interrupts[]={18,37,38,39,71,-1};
 /* USER CODE END 0 */
 
 /**
@@ -71,12 +77,23 @@ SMInfo smInfo;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	//initialize for the state machine
-	smInfo.masterState = READ_BUTTON;
-	smInfo.ReadFlag = false;
-	smInfo.buttonState = 0b00000000;
-	smInfo.rgbState = 0b00000000;
 
+	//master USART1 initialization
+	//create queue for USART1 and USART2
+	queueInit(&usart1TXQ,sizeof(uint16_t));
+	queueInit(&usart2TXQ,sizeof(uint16_t));
+	queueInit(&usart3TXQ,sizeof(uint16_t));
+	queueInit(&usart6TXQ,sizeof(uint16_t));
+	queueInit(&smQueue,sizeof(SMInfo));
+
+	//initialize adc state
+	adcInfo.state=ADC5;
+
+	//initialize for the state machine
+	U1Info.state = READ_BUTTON;
+	U1Info.ReadFlag = false;
+	U1Info.ledState = 0;
+	U1Info.buttonState = 0;
 
 
 	//USART1, USART2, USART3, USART6 clock enable
@@ -90,33 +107,54 @@ int main(void)
 
 
 	//GPIO clock enable
-	RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOARST | RCC_AHB1RSTR_GPIOGRST | RCC_AHB1RSTR_GPIOBRST | RCC_AHB1RSTR_GPIOCRST);
-	RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST | RCC_AHB1RSTR_GPIOGRST | RCC_AHB1RSTR_GPIOBRST | RCC_AHB1RSTR_GPIOCRST);
-	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOGEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN);
+	RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOARST | RCC_AHB1RSTR_GPIOGRST \
+			| RCC_AHB1RSTR_GPIOBRST | RCC_AHB1RSTR_GPIOCRST | RCC_AHB1RSTR_GPIODRST);
+	RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST | RCC_AHB1RSTR_GPIOGRST \
+			| RCC_AHB1RSTR_GPIOBRST | RCC_AHB1RSTR_GPIOCRST | RCC_AHB1RSTR_GPIODRST);
+	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOGEN \
+			| RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN);
 
+
+	RCC->APB2RSTR |= RCC_APB2RSTR_ADCRST;
+	RCC->APB2RSTR &= ~(RCC_APB2RSTR_ADCRST);
+	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
+	int channelList[]={5,13,-1};
+
+	configGPIOWithoutAF(GPIOA,5,GPIO_ANALOG,OUTPUT_PUSH_PULL,LOW_SPEED,NO_PUPD);
+	configGPIOWithoutAF(GPIOC,3,GPIO_ANALOG,OUTPUT_PUSH_PULL,LOW_SPEED,NO_PUPD);
+
+	nvicEnableInterrupt(NVIC,18);
+
+	adcConfig(ADC1, ADC_CR1_RES_12 | ADC_CR1_DISCEN | ADC_CR1_SCAN		\
+			  | ADC_CR1_EOCIE | ADC_CR2_EOCS);
+
+	adcSamplingTime(ADC1,5,_480_CYCLES);
+	adcSamplingTime(ADC1,13,_480_CYCLES);
+	adcSetChannelSequence(ADC1,&channelList);
+	adcConfig(ADC1, ADC_CR2_ADON);
 
 	//37:USART1
 	//38:USART2
 	//39:USART3
 	//71:USART6
-	nvicEnableInterrupt(37);
-	nvicEnableInterrupt(38);
-	nvicEnableInterrupt(39);
-	nvicEnableInterrupt(71);
+	nvicEnableInterrupt(NVIC,37);
+	nvicEnableInterrupt(NVIC,38);
+	nvicEnableInterrupt(NVIC,39);
+	nvicEnableInterrupt(NVIC,71);
 
 	//master
 	//AF7
 	//USART1_TX	PA9
-	//USART1_RX	PA10
+	//USART1_RX	PB7
 	configGPIO(GPIOA,9,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
-	configGPIO(GPIOA,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+	configGPIO(GPIOB,7,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 
 	//slave
-	//USART2_TX	PA2
+	//USART2_TX	PD5
 	//USART2_RX	PA3
-	configGPIO(GPIOA,2,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+	configGPIO(GPIOD,5,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
 	configGPIO(GPIOA,3,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF7);
@@ -143,8 +181,9 @@ int main(void)
 	UsartConfigData usartConfigData;
 	usartConfigData.baudrate = 9600;
 	usartConfigData.peripheralFreq = 45000000;
-	usartConfig(USART1,WORD_9_BIT_DATA | RXNE_IT 		\
-			| TRANSMIT_ENABLE | RECEIVER_ENABLE			\
+	usartConfigData.muteModeAdress = 0;
+	usartConfig(USART1,WORD_9_BIT_DATA | RXNE_IT 			\
+			| TRANSMIT_ENABLE | RECEIVER_ENABLE				\
 			,&usartConfigData);
 	usartCR1(USART1,USART_ENABLE);
 
@@ -221,7 +260,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  stateMachine(USART1,&smInfo);
+	  if(getQueueSize(&smQueue)==0){
+		  stateMachineV2(&U1Info,&usart1TXQ);
+	  }else{
+		  dequeue(&smQueue,&smInfoOut);
+		  stateMachineV2(smInfoOut.info,smInfoOut.usartQueue);
+	  }
+
+	  HAL_Delay(15);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -293,76 +339,79 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-uint16_t U1Msg=0;
-SlaveInfo slaveInfoU2;
-SlaveInfo slaveInfoU3;
-SlaveInfo slaveInfoU6;
 
+uint16_t U1Msg=0;
 void USART1_IRQHandler(void){
 	if(USART1->SR & USART_READY_TO_READ){
 		U1Msg = (uint16_t)(0x1ff & USART1->DR);
+		if(U1Info.ReadFlag == false){
+			U1Info.buttonState = U1Msg;
+		}
+	}else if(USART1->SR & TRANSMIT_COMPLETE){
+		ITDequeue(USART1,&usart1TXQ);
 	}
-	if(smInfo.ReadFlag == false && U1Msg==1){
-		smInfo.buttonState = 1;
-	}else if(smInfo.ReadFlag == false && U1Msg!=1){
-		smInfo.buttonState = 0;
-	}
-
 }
 
 void USART2_IRQHandler(void){
 	if(USART2->SR & USART_READY_TO_READ){
-		slaveInfoU2.message = (uint16_t)(0x1ff & USART2->DR);
-	}
-	slaveInfoU2.state = CHECK_ADDRESS;
-	slaveInfoU2.address = 0b100100001;
-	checkAddress(&slaveInfoU2);
+		U2Info.message = (uint16_t)(0x1ff & USART2->DR);
+		checkAddressV2(&U2Info,0b100100001,U2_MATCH_ADDRESS);
 
-	//read button & send back
-	switch(slaveInfoU2.state){
-	case TASK_1:
-		usartSend9Bit(USART2,(uint16_t)readGPIO(GPIOA,0));
-		slaveInfoU2.state = CHECK_ADDRESS;
-		break;
+		//stateMachineV2(&U2Info,&usart2TXQ);
+
+
+		nvicMultiDisableInterrupt(NVIC,interrupts);
+		smInfo.info=(&U2Info);
+		smInfo.usartQueue=(&usart2TXQ);
+		enqueue(&smQueue,&smInfo);
+		nvicMultiEnableInterrupt(NVIC,interrupts);
+
+	}else if(USART2->SR & TRANSMIT_COMPLETE){
+		ITDequeue(USART2,&usart2TXQ);
 	}
 }
 
 void USART3_IRQHandler(void){
-	if(USART3->SR & USART_READY_TO_READ){
-		slaveInfoU3.message = (uint16_t)(0x1ff & USART3->DR);
-	}
-	slaveInfoU3.state = CHECK_ADDRESS;
-	slaveInfoU3.address = 0b100100010;
-	checkAddress(&slaveInfoU3);
+	U3Info.message = (uint16_t)(0x1ff & USART3->DR);
+	checkAddressV2(&U3Info,0b100100010,U3_MATCH_ADDRESS);
 
-	//read button & send back
-	switch(slaveInfoU3.state){
-	case TASK_1:
-		setResetGPIO(GPIOG,13, (slaveInfoU3.message & 0x1));
-		slaveInfoU3.state = CHECK_ADDRESS;
-		break;
-	}
+	//stateMachineV2(&U3Info,&usart3TXQ);
+	nvicMultiDisableInterrupt(NVIC,interrupts);
+	smInfo.info=(&U3Info);
+	smInfo.usartQueue=(&usart3TXQ);
+	enqueue(&smQueue,&smInfo);
+	nvicMultiEnableInterrupt(NVIC,interrupts);
+
+
 }
 
 void USART6_IRQHandler(void){
 	if(USART6->SR & USART_READY_TO_READ){
-		slaveInfoU6.message = (uint16_t)(0x1ff & USART6->DR);
-	}
-	slaveInfoU6.state = CHECK_ADDRESS;
-	slaveInfoU6.address = 0b100100011;
-	checkAddress(&slaveInfoU6);
+		U6Info.message = (uint16_t)(0x1ff & USART6->DR);
+		checkAddressV2(&U6Info,0b100100011,U6_MATCH_ADDRESS);
 
-	//read button & send back
-	switch(slaveInfoU6.state){
-	case TASK_1:
-		//send back to PC
-		slaveInfoU6.state = TASK_2;
-		break;
-	case TASK_2:
-		//send back to PC
-		slaveInfoU6.state = CHECK_ADDRESS;
-		break;
+		//stateMachineV2(&U6Info,&usart6TXQ);
+
+
+		nvicMultiDisableInterrupt(NVIC,interrupts);
+		smInfo.info=(&U6Info);
+		smInfo.usartQueue=(&usart6TXQ);
+		enqueue(&smQueue,&smInfo);
+		nvicMultiEnableInterrupt(NVIC,interrupts);
+
+	}else if(USART6->SR & TRANSMIT_COMPLETE){
+		ITDequeue(USART6,&usart6TXQ);
 	}
+}
+
+void ADC_IRQHandler(void){
+	adcInfo.adcData = (uint32_t)(ADC1->DR);
+
+	nvicMultiDisableInterrupt(NVIC,interrupts);
+	smInfo.info=(&adcInfo);
+	enqueue(&smQueue,&smInfo);
+	nvicMultiEnableInterrupt(NVIC,interrupts);
+
 }
 /* USER CODE END 4 */
 

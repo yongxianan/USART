@@ -7,19 +7,28 @@
 
 #ifndef QUEUE_H_
 #define QUEUE_H_
+#include <malloc.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
-// A structure to represent a queue
-typedef struct
-{
-	int front, rear, size;
-	unsigned capacity;
-	int* array;
-}Queue;
+typedef struct Node Node;
+struct Node{
+	void *data;
+	Node *next;
+};
 
-Queue* createQueue(unsigned capacity);
-int isFull(Queue* queue);
-int isEmpty(Queue* queue);
-void enqueue(Queue* queue, int item);
-int dequeue(Queue* queue);
+typedef struct Queue Queue;
+struct Queue{
+    int queueSize;
+    size_t dataSize;
+    Node *head;
+    Node *tail;
+    bool TxItEnable;
+};
+
+void queueInit(Queue *queue, size_t memSize);
+bool enqueue(Queue *queue, void *data);
+bool dequeue(Queue *queue, void *data);
 
 #endif /* QUEUE_H_ */

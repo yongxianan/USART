@@ -7,36 +7,51 @@
 
 #include "NVIC.h"
 
-void nvicEnableInterrupt(int interruptNumber){
+void nvicMultiEnableInterrupt(NvicRegs *nvic,int *interruptNumber){
+	int i=0;
+	while(interruptNumber[i]!=-1){
+		nvicEnableInterrupt(nvic,interruptNumber[i]);
+		i++;
+	}
+}
+void nvicMultiDisableInterrupt(NvicRegs *nvic,int *interruptNumber){
+	int i=0;
+	while(interruptNumber[i]!=-1){
+		nvicDisableInterrupt(nvic,interruptNumber[i]);
+		i++;
+	}
+}
+
+void nvicEnableInterrupt(NvicRegs *nvic, int interruptNumber){
 	int n, bit;
 	n = interruptNumber/32;
 	bit = interruptNumber%32;
-	nvic-> ISER[n] = 1 << bit;
+	nvic-> ISER[n] |= (1 << bit);
 }
 
 
-void nvicDisableInterrupt(int interruptNumber){
+void nvicDisableInterrupt(NvicRegs *nvic,int interruptNumber){
 	int n, bit;
 	n = interruptNumber/32;
 	bit = interruptNumber%32;
-	nvic-> ICER[n] = 1 << bit ;
+	nvic-> ICER[n] |= (1 << bit);
 }
 
 
-void nvicEnablePendingInterrupt(int interruptNumber){
+void nvicEnablePendingInterrupt(NvicRegs *nvic,int interruptNumber){
 	int n, bit;
 	n = interruptNumber/32;
 	bit = interruptNumber%32;
-	nvic-> ISPR[n] = 1 << bit ;
+	nvic-> ISPR[n] |= (1 << bit);
 }
 
 
 
-void nvicDisablePendingInterrupt(int interruptNumber){
+void nvicDisablePendingInterrupt(NvicRegs *nvic,int interruptNumber){
 	int n, bit;
 	n = interruptNumber/32;
 	bit = interruptNumber%32;
-	nvic-> ICPR[n] = 1 << bit ;
+	nvic-> ICPR[n]  |= (1 << bit);
 }
 
 
@@ -47,7 +62,7 @@ void nvicDisablePendingInterrupt(int interruptNumber){
  * Return :
  * 	0			means not active
  * 	non-zero 	means active*/
-int nvicIsInterruptActive(int interruptNumber){
+int nvicIsInterruptActive(NvicRegs *nvic,int interruptNumber){
 	int n, bit;
 	n = interruptNumber/32;
 	bit = interruptNumber%32;

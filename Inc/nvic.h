@@ -9,6 +9,7 @@
 #define NVIC_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 typedef volatile uint32_t NVICRegister;
 
 typedef struct NvicRegs NvicRegs;
@@ -28,12 +29,15 @@ struct NvicRegs{
 	NVICRegister STIR;
 };
 
-#define nvic 	((NvicRegs *)0xE000E100)
 
 
-void nvicEnableInterrupt(int interruptNumber);
-void nvicDisableInterrupt(int interruptNumber);
-int nvicIsInterruptActive(int interruptNumber);
 
+void nvicEnableInterrupt(NvicRegs *nvic,int interruptNumber);
+void nvicDisableInterrupt(NvicRegs *nvic,int interruptNumber);
+int nvicIsInterruptActive(NvicRegs *nvic,int interruptNumber);
 
+void nvicMultiEnableInterrupt(NvicRegs *nvic,int *interruptNumber);
+void nvicMultiDisableInterrupt(NvicRegs *nvic,int *interruptNumber);
+
+#define NVIC 	((NvicRegs *)(0xE000E100))
 #endif /* NVIC_H_ */
