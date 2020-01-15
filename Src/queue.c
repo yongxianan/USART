@@ -9,6 +9,61 @@
 
 #include "queue.h"
 
+
+
+void queueInit(Queue *queue)
+{
+   queue->queueSize = 0;
+   queue->head = queue->tail = NULL;
+}
+
+void enqueue(Queue *queue, Event *newNode)
+{
+	newNode->next=NULL;
+    if(queue->queueSize == 0){
+        queue->head = queue->tail = newNode;
+    }else{
+        queue->tail->next = newNode;
+        queue->tail = newNode;
+    }
+	queue->queueSize++;
+}
+
+Event *dequeue(Queue *queue)
+{
+    if(queue->queueSize > 0){
+    	Event *temp = queue->head;
+        if(queue->queueSize > 1){
+            queue->head = queue->head->next;
+        }
+        else{
+            queue->head = NULL;
+            queue->tail = NULL;
+        }
+        queue->queueSize--;
+		return temp;
+    }
+    return NULL;
+}
+
+void eventEnqueue(Queue *queue, Event *newNode){
+	nvicMultiDisableInterrupt(NVIC,interrupts);
+	enqueue(queue, newNode);
+	nvicMultiEnableInterrupt(NVIC,interrupts);
+}
+
+Event *eventDequeue(Queue *queue){
+	nvicMultiDisableInterrupt(NVIC,interrupts);
+	Event *temp=dequeue(queue);
+	nvicMultiEnableInterrupt(NVIC,interrupts);
+	return temp;
+}
+
+int getQueueSize(Queue *queue){
+    return queue->queueSize;
+}
+
+/*
 void queueInit(Queue *queue, size_t dataSize)
 {
    queue->queueSize = 0;
@@ -64,6 +119,6 @@ bool dequeue(Queue *queue, void *data)
 int getQueueSize(Queue *queue){
     return queue->queueSize;
 }
-
+*/
 
 

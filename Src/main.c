@@ -62,12 +62,11 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//SMInfo smInfo;
-Info U1Info,U2Info,U3Info,U6Info,adcInfo;
-Queue usart1TXQ,usart2TXQ,usart3TXQ,usart6TXQ;
-SMInfo smInfo,smInfoOut;
-Queue smQueue;
-volatile int interrupts[]={18,37,38,39,71,-1};
+Queue execQueue,U1ISRQueue,U2ISRQueue,U3ISRQueue,U4ISRQueue,U6ISRQueue,ADCISRQueue;
+Event *execEvent,*event1,*event2,*event3,*event4,*event6,*eventA;
+uint32_t dataIndex1=0,dataIndex2=0,dataIndex3=0,dataIndex4=0,dataIndex6=0;
+int interrupts[]={18,37,38,39,52,71,-1};
+uint16_t data[]={6};
 /* USER CODE END 0 */
 
 /**
@@ -77,24 +76,21 @@ volatile int interrupts[]={18,37,38,39,71,-1};
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	volatile SMFuncPtr smFuncPtr;
 	//master USART1 initialization
 	//create queue for USART1 and USART2
-	queueInit(&usart1TXQ,sizeof(uint16_t));
-	queueInit(&usart2TXQ,sizeof(uint16_t));
-	queueInit(&usart3TXQ,sizeof(uint16_t));
-	queueInit(&usart6TXQ,sizeof(uint16_t));
-	queueInit(&smQueue,sizeof(SMInfo));
-
-	//initialize adc state
-	adcInfo.state=ADC5;
-
+	queueInit(&execQueue);
+	queueInit(&U1ISRQueue);
+	queueInit(&U2ISRQueue);
+	queueInit(&U3ISRQueue);
+	queueInit(&U4ISRQueue);
+	queueInit(&U6ISRQueue);
+	queueInit(&ADCISRQueue);
 	//initialize for the state machine
-	U1Info.state = READ_BUTTON;
-	U1Info.ReadFlag = false;
-	U1Info.ledState = 0;
-	U1Info.buttonState = 0;
-
+	eventEnqueue(&execQueue,createEvent(START_EVENT,&slave2SM,0,data,RX_DATA));
+	eventEnqueue(&execQueue,createEvent(START_EVENT,&slave3SM,0,data,RX_DATA));
+	eventEnqueue(&execQueue,createEvent(START_EVENT,&slave6SM,0,data,RX_DATA));
+	eventEnqueue(&execQueue,createEvent(START_EVENT,&master1SM,0,data,RX_DATA));
 
 	//USART1, USART2, USART3, USART6 clock enable
 	RCC->APB1RSTR |= (RCC_APB1RSTR_USART2RST | RCC_APB1RSTR_USART3RST);
@@ -123,7 +119,7 @@ int main(void)
 	configGPIOWithoutAF(GPIOA,5,GPIO_ANALOG,OUTPUT_PUSH_PULL,LOW_SPEED,NO_PUPD);
 	configGPIOWithoutAF(GPIOC,3,GPIO_ANALOG,OUTPUT_PUSH_PULL,LOW_SPEED,NO_PUPD);
 
-	nvicEnableInterrupt(NVIC,18);
+
 
 	adcConfig(ADC1, ADC_CR1_RES_12 | ADC_CR1_DISCEN | ADC_CR1_SCAN		\
 			  | ADC_CR1_EOCIE | ADC_CR2_EOCS);
@@ -137,10 +133,7 @@ int main(void)
 	//38:USART2
 	//39:USART3
 	//71:USART6
-	nvicEnableInterrupt(NVIC,37);
-	nvicEnableInterrupt(NVIC,38);
-	nvicEnableInterrupt(NVIC,39);
-	nvicEnableInterrupt(NVIC,71);
+	nvicMultiEnableInterrupt(NVIC,interrupts);
 
 	//master
 	//AF7
@@ -174,6 +167,15 @@ int main(void)
 	configGPIO(GPIOC,6,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF8);
 	configGPIO(GPIOC,7,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,VERY_HIGH_SPEED,NO_PUPD,AF8);
+
+	//slave
+	//AF8
+	//UART4_TX	PC10
+	//UART4_RX	PC11
+	configGPIO(GPIOC,10,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
+		,VERY_HIGH_SPEED,NO_PUPD,AF8);
+	configGPIO(GPIOC,11,GPIO_ALT_FUNC,OUTPUT_PUSH_PULL			\
 		,VERY_HIGH_SPEED,NO_PUPD,AF8);
 
 
@@ -224,6 +226,15 @@ int main(void)
 			,&usartConfigData3);
 	usartCR1(USART6,USART_ENABLE);
 
+	//UART4 configure (slave)
+	UsartConfigData usartConfigData4;
+	usartConfigData4.baudrate = 9600;
+	usartConfigData4.peripheralFreq = 45000000;
+	usartConfigData4.muteModeAdress = 0;
+	usartConfig(UART4,WORD_9_BIT_DATA | RXNE_IT 			\
+			| TRANSMIT_ENABLE | RECEIVER_ENABLE				\
+			,&usartConfigData4);
+	usartCR1(UART4,USART_ENABLE);
 	/*
 	 * PG13	green LED
 	 * PA0	blue button
@@ -260,14 +271,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(getQueueSize(&smQueue)==0){
-		  stateMachineV2(&U1Info,&usart1TXQ);
-	  }else{
-		  dequeue(&smQueue,&smInfoOut);
-		  stateMachineV2(smInfoOut.info,smInfoOut.usartQueue);
+	  if(getQueueSize(&execQueue)!=0){
+		  execEvent=eventDequeue(&execQueue);
+		  smFuncPtr=execEvent->smFuncPtr;
+		  smFuncPtr(execEvent);
 	  }
-
-	  HAL_Delay(15);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -340,78 +348,30 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-uint16_t U1Msg=0;
 void USART1_IRQHandler(void){
-	if(USART1->SR & USART_READY_TO_READ){
-		U1Msg = (uint16_t)(0x1ff & USART1->DR);
-		if(U1Info.ReadFlag == false){
-			U1Info.buttonState = U1Msg;
-		}
-	}else if(USART1->SR & TRANSMIT_COMPLETE){
-		ITDequeue(USART1,&usart1TXQ);
-	}
+	event1=isrUsartEvent(USART1,&U1ISRQueue,event1,&dataIndex1);
 }
 
 void USART2_IRQHandler(void){
-	if(USART2->SR & USART_READY_TO_READ){
-		U2Info.message = (uint16_t)(0x1ff & USART2->DR);
-		checkAddressV2(&U2Info,0b100100001,U2_MATCH_ADDRESS);
-
-		//stateMachineV2(&U2Info,&usart2TXQ);
-
-
-		nvicMultiDisableInterrupt(NVIC,interrupts);
-		smInfo.info=(&U2Info);
-		smInfo.usartQueue=(&usart2TXQ);
-		enqueue(&smQueue,&smInfo);
-		nvicMultiEnableInterrupt(NVIC,interrupts);
-
-	}else if(USART2->SR & TRANSMIT_COMPLETE){
-		ITDequeue(USART2,&usart2TXQ);
-	}
+	event2=isrUsartEvent(USART2,&U2ISRQueue,event2,&dataIndex2);
 }
 
 void USART3_IRQHandler(void){
-	U3Info.message = (uint16_t)(0x1ff & USART3->DR);
-	checkAddressV2(&U3Info,0b100100010,U3_MATCH_ADDRESS);
-
-	//stateMachineV2(&U3Info,&usart3TXQ);
-	nvicMultiDisableInterrupt(NVIC,interrupts);
-	smInfo.info=(&U3Info);
-	smInfo.usartQueue=(&usart3TXQ);
-	enqueue(&smQueue,&smInfo);
-	nvicMultiEnableInterrupt(NVIC,interrupts);
-
-
+	event3=isrUsartEvent(USART3,&U3ISRQueue,event3,&dataIndex3);
 }
 
 void USART6_IRQHandler(void){
-	if(USART6->SR & USART_READY_TO_READ){
-		U6Info.message = (uint16_t)(0x1ff & USART6->DR);
-		checkAddressV2(&U6Info,0b100100011,U6_MATCH_ADDRESS);
-
-		//stateMachineV2(&U6Info,&usart6TXQ);
-
-
-		nvicMultiDisableInterrupt(NVIC,interrupts);
-		smInfo.info=(&U6Info);
-		smInfo.usartQueue=(&usart6TXQ);
-		enqueue(&smQueue,&smInfo);
-		nvicMultiEnableInterrupt(NVIC,interrupts);
-
-	}else if(USART6->SR & TRANSMIT_COMPLETE){
-		ITDequeue(USART6,&usart6TXQ);
-	}
+	event6=isrUsartEvent(USART6,&U6ISRQueue,event6,&dataIndex6);
 }
 
+void UART4_IRQHandler(void){
+	event4=isrUsartEvent(UART4,&U4ISRQueue,event4,&dataIndex4);
+}
 void ADC_IRQHandler(void){
-	adcInfo.adcData = (uint32_t)(ADC1->DR);
-
-	nvicMultiDisableInterrupt(NVIC,interrupts);
-	smInfo.info=(&adcInfo);
-	enqueue(&smQueue,&smInfo);
-	nvicMultiEnableInterrupt(NVIC,interrupts);
-
+	eventA=eventDequeue(&ADCISRQueue);
+	eventA->data[0] = (uint32_t)(ADC1->DR);
+	eventEnqueue(&execQueue,eventA);
+	//release event
 }
 /* USER CODE END 4 */
 

@@ -7,12 +7,72 @@
 
 #ifndef STATE_MACHINE_H_
 #define STATE_MACHINE_H_
-#include <stdbool.h>
+#include <stdint.h>
+#include <malloc.h>
 #include "uart.h"
 #include "gpio.h"
 #include "queue.h"
 #include "adc.h"
 
+
+
+
+extern Queue execQueue,U1ISRQueue,U2ISRQueue,U3ISRQueue			\
+,U4ISRQueue,U6ISRQueue,ADCISRQueue;
+
+
+
+//typedef void(*SMFuncPtr)(Event *execEvent);
+/*
+typedef struct Event Event;
+struct Event{
+	EventName Name;
+	DataType dataType;
+	FuncPtrEnum funcPtrEnum;
+	uint16_t length;
+	uint16_t data[50];
+	Event *next;
+};
+*/
+void master1SM(Event *execEvent);
+void slave2SM(Event *execEvent);
+void slave3SM(Event *execEvent);
+void slave4SM(Event *execEvent);
+void slave6SM(Event *execEvent);
+Event *createEvent(EventName eventName,SMFuncPtr smFuncPtr,uint16_t length,uint16_t *data,DataType dataType);
+
+/*
+typedef struct Event Event;
+struct Event{
+	EventName eventName;
+	SMInfo *smInfo;
+	uint32_t length;
+	uint32_t data;
+	Node *next;
+	Event *nextEvent;
+};
+
+typedef void(*SMFuncPtr)(Event *event);
+
+typedef struct SMInfo SMInfo;
+struct SMInfo{
+	SMFuncPtr smFuncPtr;
+	State state;
+	//data store by StateMachine
+
+};
+*/
+
+
+
+
+
+
+
+
+
+
+/*
 typedef enum{
 	//used by master
 	READ_BUTTON,
@@ -53,4 +113,5 @@ typedef struct{
 //void stateMachine(USART *usart, SMInfo *smInfo);
 void checkAddressV2(Info *UInfo,uint16_t expAddress,State setMatchAddr);
 void stateMachineV2(Info *UInfo,Queue *usartTXQ);
+*/
 #endif /* STATE_MACHINE_H_ */

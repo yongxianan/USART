@@ -10,7 +10,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdint.h>
 
 typedef struct USART USART;
 struct USART{
@@ -34,6 +33,7 @@ struct UsartConfigData{
 #define USART2 ((USART *)(0x40004400))
 #define USART3 ((USART *)(0x40004800))
 #define USART6 ((USART *)(0x40011400))
+#define UART4  ((USART *)(0x40004C00))
 
 /*
  * USART_SR

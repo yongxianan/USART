@@ -6,7 +6,6 @@
  */
 
 #include "uart.h"
-#include "queue.h"
 /*
  * RWU bit (mute mode) and WAKE bit
  * Address mark detection can be configure in CR1
@@ -36,7 +35,7 @@ void usartSend9Bit(USART *usart,uint16_t data){
 	while(!(usart->SR & TRANSMIT_COMPLETE));
 	usart->DR = (data & 0x1ff);
 }
-
+/*
 void usartSend9BitV2(USART *usart,Queue *queue, uint16_t data)
 {
 	enqueue(queue,(void *)&data);
@@ -65,3 +64,4 @@ void ITDequeue(USART *usart,Queue *queue){
 		queue->TxItEnable=false;
 	}
 }
+*/
